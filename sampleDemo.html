@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrowdSafe AI Platform Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.10/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f3f4f6;
+        }
+        .sidebar {
+            background-color: #1f2937;
+            color: white;
+            height: 100vh;
+            padding: 20px;
+            position: fixed;
+            width: 250px;
+        }
+        .sidebar h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        .sidebar button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #374151;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .sidebar button:hover {
+            background-color: #4b5563;
+        }
+        .content {
+            margin-left: 270px;
+            padding: 20px;
+        }
+        .arvr-container {
+            width: 100%;
+            height: 300px;
+            background-color: #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Role-Based Access Control Component
+        function RBAC({ userRole, children }) {
+            const allowedComponents = {
+                public: ['EventList', 'SafetyAdvisory', 'Chatbot'],
+                celebrity: ['EventSubmission', 'EventPlan', 'ARVRSimulation', 'Chatbot'],
+                police: ['EventApproval', 'CrowdMonitoring', 'CoordinationDashboard']
+            };
+            return allowedComponents[userRole]?.includes(children.type.name) ? children : (
+                <div className="text-red-500 p-4">Access Denied: This feature is not available for your role.</div>
+            );
+        }
+
+        // Event List Component (Public Access)
+        function EventList() {
+            const [events, setEvents] = useState([]);
+            useEffect(() => {
+                // Simulate API call to fetch approved events
+                setEvents([
+                    { id: 1, name: "Celebrity Meet", date: "2025-06-10", crowdSize: "5000", risk: "Medium", status: "Approved" },
+                    { id: 2, name: "Political Rally", date: "2025-06-12", crowdSize: "10000", risk: "High", status: "Approved" }
+                ]);
+            }, []);
+            return (
+                <div className="p-4 bg-white rounded shadow">
+                    <h2 className="text-2xl font-bold mb-4">Approved Events</h2>
+                    {events.map(event => (
+                        <div key={event.id} className="p-4 mb-2 bg-gray-50 rounded border">
+                            <p><strong>{event.name}</strong> - {event.date}</p>
+                            <p>Expected Crowd: {event.crowdSize}</p>
+                            <p>Risk Level: {event.risk}</p>
+                            <p>Status: <span className="text-green-500">{event.status}</span></p>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // Safety Advisory Component (Public Access)
+        function SafetyAdvisory() {
+            return (
+                <div className="p-4 bg-yellow-100 rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">Safety Advisory</h2>
+                    <p>Avoid peak hours and use designated entry points for safety.</p>
+                    <p>Check real-time crowd updates and transport schedules.</p>
+                    <p>Scan QR code at geofenced entry points for access.</p>
+                    <p>Public Transport: Extra BMTC buses scheduled for high-risk events.</p>
+                </div>
+            );
+        }
+
+        // Chatbot Component (Public and Celebrity Access)
+        function Chatbot() {
+            const [query, setQuery] = useState("");
+            const [response, setResponse] = useState("");
+            const handleQuery = (e) => {
+                e.preventDefault();
+                // Simulate Grok API call
+                setResponse(`AI Response: For "${query}", check safety advisories or contact support.`);
+            };
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">Ask CrowdSafe AI</h2>
+                    <form onSubmit={handleQuery} className="space-y-4">
+                        <input
+                            type="text"
+                            placeholder="Ask about events or safety..."
+                            className="w-full p-2 border rounded"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                        />
+                        <button type="submit" className="bg-green-500 text-white p-2 rounded">Ask</button>
+                    </form>
+                    {response && <p className="mt-2">{response}</p>}
+                </div>
+            );
+        }
+
+        // Event Submission Component (Celebrity Access)
+        function EventSubmission() {
+            const [formData, setFormData] = useState({ name: "", date: "", location: "" });
+            const [status, setStatus] = useState("");
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                // Simulate AI review and police approval
+                setStatus("Event submitted for AI review and police approval. You cannot proceed until approved.");
+            };
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">Submit Event Request</h2>
+                    <p className="text-red-500 mb-2">Note: Events cannot proceed without police approval.</p>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <input
+                            type="text"
+                            placeholder="Event Name"
+                            className="w-full p-2 border rounded"
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        />
+                        <input
+                            type="date"
+                            className="w-full p-2 border rounded"
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Location"
+                            className="w-full p-2 border rounded"
+                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        />
+                        <button type="submit" className="bg-blue-500 text-white p-2 rounded">Submit for Approval</button>
+                    </form>
+                    {status && <p className="mt-2 text-blue-600">{status}</p>}
+                </div>
+            );
+        }
+
+        // Event Plan Component (Celebrity Access)
+        function EventPlan() {
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">AI-Generated Event Plan</h2>
+                    <p><strong>Venue:</strong> Open Ground, MG Road</p>
+                    <p><strong>Timing:</strong> 10 AM - 12 PM</p>
+                    <p><strong>Security:</strong> 50 officers, 4 entry points</p>
+                    <p><strong>Emergency Routes:</strong> 2 exits, hospital 2 km away</p>
+                    <p><strong>Transport:</strong> 5 additional BMTC buses scheduled</p>
+                    <p><strong>Geofenced Zones:</strong> Entry restricted to QR code holders</p>
+                </div>
+            );
+        }
+
+        // AR/VR Simulation Component (Celebrity Access)
+        function ARVRSimulation() {
+            useEffect(() => {
+                // Simulate basic Three.js setup for AR/VR placeholder
+                const container = document.getElementById('arvr-container');
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                const cube = new THREE.Mesh(geometry, material);
+                scene.add(cube);
+                camera.position.z = 5;
+                const animate = () => {
+                    requestAnimationFrame(animate);
+                    cube.rotation.x += 0.01;
+                    cube.rotation.y += 0.01;
+                    renderer.render(scene, camera);
+                };
+                animate();
+            }, []);
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">AR/VR Crowd Simulation</h2>
+                    <p>Visualize crowd flow and optimize venue setup.</p>
+                    <div id="arvr-container" className="arvr-container">
+                        <p>Loading 3D crowd simulation...</p>
+                    </div>
+                    <p className="mt-2">Recommendations: Add 2 more entry points to avoid bottlenecks.</p>
+                </div>
+            );
+        }
+
+        // Event Approval Component (Police Access)
+        function EventApproval() {
+            const [pendingEvents, setPendingEvents] = useState([
+                { id: 1, name: "Concert", risk: "High" },
+                { id: 2, name: "Sports Event", risk: "Medium" }
+            ]);
+            const handleApprove = (id) => {
+                setPendingEvents(pendingEvents.filter(event => event.id !== id));
+                alert(`Event ${id} approved and logged on blockchain.`);
+            };
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">Event Approval</h2>
+                    <p>AI-approved events: 5 | Pending high-risk review: {pendingEvents.length}</p>
+                    <p>Blockchain Log: All approvals recorded</p>
+                    {pendingEvents.map(event => (
+                        <div key={event.id} className="p-2 mb-2 bg-gray-50 rounded border">
+                            <p><strong>{event.name}</strong> - Risk: {event.risk}</p>
+                            <button
+                                onClick={() => handleApprove(event.id)}
+                                className="bg-green-500 text-white p-2 rounded mt-2"
+                            >
+                                Approve
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // Crowd Monitoring Component (Police Access)
+        function CrowdMonitoring() {
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">Real-Time Crowd Monitoring</h2>
+                    <p><strong>Crowd Density:</strong> 70% (Warning: Approaching Critical)</p>
+                    <p><strong>Heatmap:</strong> High density at main entrance</p>
+                    <p><strong>Geofence Status:</strong> 2 unauthorized entries detected</p>
+                    <p><strong>Alert:</strong> Potential crowd surge detected</p>
+                </div>
+            );
+        }
+
+        // Coordination Dashboard Component (Police Access)
+        function CoordinationDashboard() {
+            return (
+                <div className="p-4 bg-white rounded shadow mt-4">
+                    <h2 className="text-2xl font-bold mb-4">Police Coordination Dashboard</h2>
+                    <p><strong>Active Events:</strong> 3 | <strong>Alerts:</strong> 1 (Crowd surge detected)</p>
+                    <p><strong>Transport:</strong> 5 BMTC buses deployed</p>
+                    <p><strong>Emergency Services:</strong> 2 ambulances on standby</p>
+                    <button className="bg-blue-500 text-white p-2 rounded mt-2">Contact Organizers</button>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [userRole, setUserRole] = useState("public");
+            const [activeSection, setActiveSection] = useState("EventList");
+
+            const renderSection = () => {
+                switch (activeSection) {
+                    case "EventList":
+                        return <RBAC userRole={userRole}><EventList /></RBAC>;
+                    case "SafetyAdvisory":
+                        return <RBAC userRole={userRole}><SafetyAdvisory /></RBAC>;
+                    case "Chatbot":
+                        return <RBAC userRole={userRole}><Chatbot /></RBAC>;
+                    case "EventSubmission":
+                        return <RBAC userRole={userRole}><EventSubmission /></RBAC>;
+                    case "EventPlan":
+                        return <RBAC userRole={userRole}><EventPlan /></RBAC>;
+                    case "ARVRSimulation":
+                        return <RBAC userRole={userRole}><ARVRSimulation /></RBAC>;
+                    case "EventApproval":
+                        return <RBAC userRole={userRole}><EventApproval /></RBAC>;
+                    case "CrowdMonitoring":
+                        return <RBAC userRole={userRole}><CrowdMonitoring /></RBAC>;
+                    case "CoordinationDashboard":
+                        return <RBAC userRole={userRole}><CoordinationDashboard /></RBAC>;
+                    default:
+                        return <EventList />;
+                }
+            };
+
+            return (
+                <div className="flex">
+                    <div className="sidebar">
+                        <h2 className="text-xl font-bold">CrowdSafe Platform</h2>
+                        <select
+                            onChange={(e) => setUserRole(e.target.value)}
+                            className="w-full p-2 mb-4 bg-gray-700 text-white rounded"
+                        >
+                            <option value="public">Public</option>
+                            <option value="celebrity">Celebrity/Organizer</option>
+                            <option value="police">Police</option>
+                        </select>
+                        <button onClick={() => setActiveSection("EventList")}>Event List</button>
+                        <button onClick={() => setActiveSection("SafetyAdvisory")}>Safety Advisory</button>
+                        <button onClick={() => setActiveSection("Chatbot")}>AI Chatbot</button>
+                        <button onClick={() => setActiveSection("EventSubmission")}>Event Submission</button>
+                        <button onClick={() => setActiveSection("EventPlan")}>Event Plan</button>
+                        <button onClick={() => setActiveSection("ARVRSimulation")}>AR/VR Simulation</button>
+                        <button onClick={() => setActiveSection("EventApproval")}>Event Approval</button>
+                        <button onClick={() => setActiveSection("CrowdMonitoring")}>Crowd Monitoring</button>
+                        <button onClick={() => setActiveSection("CoordinationDashboard")}>Coordination Dashboard</button>
+                    </div>
+                    <div className="content">
+                        {renderSection()}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
