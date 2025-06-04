@@ -251,6 +251,8 @@ export const insertEventSchema = createInsertSchema(events).omit({
   rejectionReason: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  date: z.string().transform((str) => new Date(str)),
 });
 
 export const insertVenueSchema = createInsertSchema(venues).omit({

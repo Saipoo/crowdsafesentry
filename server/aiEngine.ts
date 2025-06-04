@@ -220,7 +220,14 @@ export function calculateRiskScore(crowdPrediction: { min: number; max: number }
   else if (avg > 10000) score += 25;
   else if (avg > 5000) score += 15;
   
-  const eventRisk = { concert: 20, political: 30, sports: 15, movie: 10, cultural: 5 }[eventData.eventType] || 10;
+  const eventRiskMap: Record<string, number> = { 
+    concert: 20, 
+    political: 30, 
+    sports: 15, 
+    movie: 10, 
+    cultural: 5 
+  };
+  const eventRisk = eventRiskMap[eventData.eventType] || 10;
   return Math.min(100, score + eventRisk);
 }
 
