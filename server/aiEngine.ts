@@ -1,7 +1,6 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export interface CrowdAnalysisData {
   eventType: string;
@@ -72,23 +71,15 @@ export async function generateAIAnalysis(eventData: CrowdAnalysisData): Promise<
     - Emergency response requirements
     `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert crowd safety analyst specializing in event risk assessment and crowd management. Provide detailed, actionable analysis based on the event data provided."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3
-    });
-
-    const analysis = JSON.parse(response.choices[0].message.content || '{}');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
     
     // Validate and sanitize the response
     return {
@@ -115,23 +106,19 @@ export async function generateAIAnalysis(eventData: CrowdAnalysisData): Promise<
 
 export async function generateChatbotResponse(query: string, context?: string): Promise<string> {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant for the CrowdSafe platform. You help users with questions about event safety, crowd management, and platform features. Keep responses concise but informative. Always prioritize safety."
-        },
-        {
-          role: "user",
-          content: context ? `Context: ${context}\n\nQuestion: ${query}` : query
-        }
-      ],
-      max_tokens: 150,
-      temperature: 0.7
-    });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const prompt = `You are a helpful assistant for the CrowdSafe platform. You help users with questions about event safety, crowd management, and platform features. Keep responses concise but informative. Always prioritize safety.
 
-    return response.choices[0].message.content || "I'm sorry, I couldn't process your request. Please try again.";
+${context ? `Context: ${context}\n\n` : ''}Question: ${query}
+
+Please provide a helpful response in 2-3 sentences maximum.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    return text || "I'm sorry, I couldn't process your request. Please try again.";
   } catch (error) {
     console.error('Chatbot Error:', error);
     return "I'm currently experiencing technical difficulties. Please contact support for assistance.";
