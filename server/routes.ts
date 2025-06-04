@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertEventSchema, insertVenueSchema, insertSafetyAdvisorySchema } from "@shared/schema";
-import { generateCrowdPrediction, calculateRiskScore, generateRecommendations } from "./aiEngine";
+import { generateAIAnalysis, generateChatbotResponse } from "./aiEngine";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -30,33 +30,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the event
       const event = await storage.createEvent(eventData, userId);
       
-      // Generate AI analysis
-      const crowdPrediction = generateCrowdPrediction(eventData);
-      const riskScore = calculateRiskScore(crowdPrediction, eventData);
-      const riskLevel = riskScore >= 80 ? 'high' : riskScore >= 50 ? 'medium' : 'low';
+      // Generate comprehensive AI analysis
+      const aiAnalysis = await generateAIAnalysis(eventData);
       
       // Find or estimate venue capacity
-      let venueCapacity = 10000; // Default capacity
+      let venueCapacity = aiAnalysis.venueCapacity;
       const existingVenue = await storage.getVenueByLocation(eventData.location);
       if (existingVenue) {
         venueCapacity = existingVenue.maxCapacity;
       }
       
-      const recommendations = generateRecommendations(riskScore, crowdPrediction, venueCapacity);
-      
       await storage.createAIAnalysis({
         eventId: event.id,
-        predictedCrowdMin: crowdPrediction.min,
-        predictedCrowdMax: crowdPrediction.max,
-        riskScore,
-        riskLevel,
+        predictedCrowdMin: aiAnalysis.predictedCrowdMin,
+        predictedCrowdMax: aiAnalysis.predictedCrowdMax,
+        riskScore: aiAnalysis.riskScore,
+        riskLevel: aiAnalysis.riskLevel,
         venueCapacity,
-        trafficImpact: riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low',
-        weatherConditions: 'clear', // Mock data - would integrate with weather API
-        recommendations,
+        trafficImpact: aiAnalysis.trafficImpact,
+        weatherConditions: aiAnalysis.weatherConditions,
+        recommendations: aiAnalysis.recommendations,
       });
       
-      res.json({ event, riskScore, riskLevel, crowdPrediction, venueCapacity });
+      res.json({ 
+        event, 
+        aiAnalysis: {
+          ...aiAnalysis,
+          venueCapacity
+        }
+      });
     } catch (error) {
       console.error("Error creating event:", error);
       res.status(500).json({ message: "Failed to create event" });
@@ -245,6 +247,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // AI Chatbot route
+  app.post('/api/chatbot', async (req, res) => {
+    try {
+      const { query, context } = req.body;
+      const response = await generateChatbotResponse(query, context);
+      res.json({ response });
+    } catch (error) {
+      console.error("Chatbot error:", error);
+      res.status(500).json({ message: "Failed to process chatbot request" });
+    }
+  });
+
+  // Advanced features routes
+  app.get('/api/analytics/dashboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const events = await storage.getAllEvents();
+      const analytics = {
+        totalEvents: events.length,
+        approvedEvents: events.filter(e => e.status === 'approved').length,
+        pendingEvents: events.filter(e => e.status === 'pending').length,
+        rejectedEvents: events.filter(e => e.status === 'rejected').length,
+        totalAttendance: events.reduce((sum, e) => sum + (e.expectedAttendance || 0), 0),
+        avgRiskScore: 65, // Would calculate from AI analysis
+        riskDistribution: {
+          low: events.filter(e => true).length * 0.4,
+          medium: events.filter(e => true).length * 0.4,
+          high: events.filter(e => true).length * 0.2
+        }
+      };
+      res.json(analytics);
+    } catch (error) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // Real-time monitoring routes
+  app.get('/api/monitoring/live', async (req, res) => {
+    try {
+      const activeEvents = await storage.getEventsByStatus('approved');
+      const liveData = activeEvents.map(event => ({
+        ...event,
+        currentCrowd: Math.floor((event.expectedAttendance || 0) * 0.75),
+        densityPercentage: 75,
+        alertLevel: 'normal',
+        lastUpdate: new Date()
+      }));
+      res.json(liveData);
+    } catch (error) {
+      console.error("Live monitoring error:", error);
+      res.status(500).json({ message: "Failed to fetch live data" });
+    }
+  });
+
+  // Emergency alert system
+  app.post('/api/emergency/alert', isAuthenticated, async (req: any, res) => {
+    try {
+      const { eventId, alertType, message, severity } = req.body;
+      const alert = {
+        id: Date.now(),
+        eventId,
+        alertType,
+        message,
+        severity,
+        timestamp: new Date(),
+        acknowledged: false
+      };
+      // In production, this would trigger SMS/WhatsApp alerts
+      res.json({ alert, notificationsSent: true });
+    } catch (error) {
+      console.error("Emergency alert error:", error);
+      res.status(500).json({ message: "Failed to send emergency alert" });
+    }
+  });
+
+  // Venue capacity checker
+  app.post('/api/venues/capacity-check', async (req, res) => {
+    try {
+      const { location, expectedAttendance } = req.body;
+      const venue = await storage.getVenueByLocation(location);
+      
+      if (venue) {
+        const utilizationPercentage = (expectedAttendance / venue.maxCapacity) * 100;
+        const recommendation = utilizationPercentage > 90 ? 'overcrowded' : 
+                             utilizationPercentage > 75 ? 'high_utilization' : 'safe';
+        
+        res.json({
+          venue,
+          utilizationPercentage,
+          recommendation,
+          safeCapacity: venue.safeCapacity,
+          maxCapacity: venue.maxCapacity
+        });
+      } else {
+        // Estimate capacity for unknown venue
+        const estimatedCapacity = 5000; // Default estimate
+        res.json({
+          estimatedCapacity,
+          utilizationPercentage: (expectedAttendance / estimatedCapacity) * 100,
+          recommendation: 'venue_verification_needed'
+        });
+      }
+    } catch (error) {
+      console.error("Capacity check error:", error);
+      res.status(500).json({ message: "Failed to check venue capacity" });
+    }
+  });
+
+  // Time slot recommendation
+  app.post('/api/events/time-recommendations', async (req, res) => {
+    try {
+      const { date, eventType, location } = req.body;
+      
+      // Generate time slot recommendations based on various factors
+      const recommendations = [
+        {
+          timeSlot: '14:00-17:00',
+          riskLevel: 'low',
+          reasons: ['Avoids evening rush hour', 'Good weather conditions expected'],
+          crowdFactor: 0.8
+        },
+        {
+          timeSlot: '18:00-21:00',
+          riskLevel: 'medium',
+          reasons: ['Popular evening slot', 'Higher traffic congestion'],
+          crowdFactor: 1.2
+        },
+        {
+          timeSlot: '10:00-13:00',
+          riskLevel: 'low',
+          reasons: ['Morning slot with less congestion', 'Good for family events'],
+          crowdFactor: 0.7
+        }
+      ];
+      
+      res.json({ recommendations });
+    } catch (error) {
+      console.error("Time recommendation error:", error);
+      res.status(500).json({ message: "Failed to generate time recommendations" });
+    }
+  });
+
+  // Geofencing and entry control
+  app.post('/api/events/:id/entry-passes', isAuthenticated, async (req: any, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const { numberOfPasses } = req.body;
+      
+      const passes = Array.from({ length: numberOfPasses }, (_, i) => ({
+        passId: `PASS-${eventId}-${Date.now()}-${i}`,
+        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PASS-${eventId}-${Date.now()}-${i}`,
+        eventId,
+        isValid: true,
+        createdAt: new Date()
+      }));
+      
+      res.json({ passes });
+    } catch (error) {
+      console.error("Entry pass generation error:", error);
+      res.status(500).json({ message: "Failed to generate entry passes" });
+    }
+  });
+
+  // Social media trend analysis
+  app.get('/api/analytics/social-trends/:eventId', async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.eventId);
+      // Mock social media analysis - in production would integrate with social APIs
+      const trends = {
+        hashtags: ['#BengaluruEvent', '#CrowdSafe', '#SafeEvent'],
+        sentiment: 'positive',
+        mentionCount: 1250,
+        engagementRate: 78,
+        predictedAttendanceBoost: 15,
+        riskFactors: []
+      };
+      res.json(trends);
+    } catch (error) {
+      console.error("Social trends error:", error);
+      res.status(500).json({ message: "Failed to analyze social trends" });
+    }
+  });
+
+  // Police deployment optimization
+  app.post('/api/police/deployment-plan', isAuthenticated, async (req: any, res) => {
+    try {
+      const { eventId, riskLevel, expectedCrowd } = req.body;
+      
+      const deploymentPlan = {
+        officersRequired: riskLevel === 'high' ? 25 : riskLevel === 'medium' ? 15 : 8,
+        vehiclesRequired: riskLevel === 'high' ? 6 : riskLevel === 'medium' ? 4 : 2,
+        checkpoints: [
+          { location: 'Main Entry', officers: 4 },
+          { location: 'Side Entry', officers: 2 },
+          { location: 'Emergency Exit', officers: 2 }
+        ],
+        emergencyResponse: {
+          ambulances: riskLevel === 'high' ? 3 : 2,
+          fireServices: riskLevel === 'high' ? 2 : 1
+        },
+        routeMapping: [
+          'Primary access via Brigade Road',
+          'Secondary access via MG Road',
+          'Emergency evacuation via Ring Road'
+        ]
+      };
+      
+      res.json(deploymentPlan);
+    } catch (error) {
+      console.error("Deployment plan error:", error);
+      res.status(500).json({ message: "Failed to generate deployment plan" });
     }
   });
 

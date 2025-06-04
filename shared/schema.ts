@@ -107,6 +107,112 @@ export const safetyAdvisories = pgTable("safety_advisories", {
   expiresAt: timestamp("expires_at"),
 });
 
+// Emergency alerts
+export const emergencyAlerts = pgTable("emergency_alerts", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  alertType: varchar("alert_type").notNull(), // crowd_surge, capacity_warning, emergency
+  message: text("message").notNull(),
+  severity: varchar("severity").notNull(), // low, medium, high, critical
+  acknowledged: boolean("acknowledged").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Entry passes for geofencing
+export const entryPasses = pgTable("entry_passes", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  passId: varchar("pass_id").notNull().unique(),
+  qrCode: text("qr_code").notNull(),
+  isValid: boolean("is_valid").default(true),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Police deployment plans
+export const deploymentPlans = pgTable("deployment_plans", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  officersRequired: integer("officers_required").notNull(),
+  vehiclesRequired: integer("vehicles_required").notNull(),
+  checkpoints: jsonb("checkpoints").notNull(),
+  emergencyResponse: jsonb("emergency_response").notNull(),
+  routeMapping: jsonb("route_mapping").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Social media trends
+export const socialTrends = pgTable("social_trends", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  hashtags: jsonb("hashtags").notNull(),
+  sentiment: varchar("sentiment").notNull(),
+  mentionCount: integer("mention_count").default(0),
+  engagementRate: integer("engagement_rate").default(0),
+  predictedAttendanceBoost: integer("predicted_attendance_boost").default(0),
+  analyzedAt: timestamp("analyzed_at").defaultNow(),
+});
+
+// Historical event data
+export const eventHistory = pgTable("event_history", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  actualAttendance: integer("actual_attendance"),
+  incidentCount: integer("incident_count").default(0),
+  crowdBehavior: text("crowd_behavior"),
+  weatherActual: varchar("weather_actual"),
+  policeFeedback: text("police_feedback"),
+  organizerFeedback: text("organizer_feedback"),
+  completedAt: timestamp("completed_at").defaultNow(),
+});
+
+// Panic button incidents
+export const panicIncidents = pgTable("panic_incidents", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id"),
+  userId: varchar("user_id").notNull(),
+  location: text("location"),
+  incidentType: varchar("incident_type").notNull(), // medical, security, crowd_issue
+  description: text("description"),
+  resolved: boolean("resolved").default(false),
+  responseTime: integer("response_time_minutes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// AI predictions tracking
+export const aiPredictions = pgTable("ai_predictions", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  predictedCrowd: integer("predicted_crowd").notNull(),
+  actualCrowd: integer("actual_crowd"),
+  accuracyScore: decimal("accuracy_score", { precision: 5, scale: 2 }),
+  modelVersion: varchar("model_version").default("1.0"),
+  predictionDate: timestamp("prediction_date").defaultNow(),
+});
+
+// Officer locations for tracking
+export const officerLocations = pgTable("officer_locations", {
+  id: serial("id").primaryKey(),
+  officerId: varchar("officer_id").notNull(),
+  eventId: integer("event_id"),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
+  status: varchar("status").default("on_duty"), // on_duty, off_duty, responding, break
+  lastUpdate: timestamp("last_update").defaultNow(),
+});
+
+// Blacklisted entities
+export const blacklist = pgTable("blacklist", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type").notNull(), // venue, organizer, celebrity
+  entityName: varchar("entity_name").notNull(),
+  reason: text("reason").notNull(),
+  severity: varchar("severity").notNull(), // warning, banned
+  addedBy: varchar("added_by").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   events: many(events),
