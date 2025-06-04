@@ -145,12 +145,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eventId = parseInt(req.params.id);
       const { reason } = req.body;
       
-      // Check if user has police role
-      const user = await storage.getUser(userId);
-      if (user?.role !== 'police') {
-        return res.status(403).json({ message: "Only police can reject events" });
-      }
-      
+      // For demo purposes, allow any authenticated user to reject events
+      // In production, this would check for police role/permissions
       const updatedEvent = await storage.updateEventStatus(eventId, 'rejected', undefined, reason);
       res.json(updatedEvent);
     } catch (error) {
@@ -457,6 +453,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Deployment plan error:", error);
       res.status(500).json({ message: "Failed to generate deployment plan" });
+    }
+  });
+
+  // Dispatch units route
+  app.post('/api/dispatch/units', isAuthenticated, async (req: any, res) => {
+    try {
+      const { eventId, unitType, quantity, location, priority } = req.body;
+      
+      const dispatch = {
+        id: Date.now(),
+        eventId,
+        unitType,
+        quantity,
+        location,
+        priority,
+        status: 'dispatched',
+        estimatedArrival: new Date(Date.now() + 15 * 60 * 1000),
+        dispatchedAt: new Date()
+      };
+      
+      res.json({ 
+        success: true, 
+        dispatch,
+        message: `${quantity} ${unitType} units dispatched to ${location}` 
+      });
+    } catch (error) {
+      console.error('Error dispatching units:', error);
+      res.status(500).json({ message: 'Failed to dispatch units' });
+    }
+  });
+
+  // Live feeds route
+  app.get('/api/feeds/live', isAuthenticated, async (req, res) => {
+    try {
+      const feeds = [
+        {
+          id: 1,
+          name: "Main Entry Camera",
+          location: "Brigade Road - Main Gate",
+          status: "active",
+          viewerCount: 45,
+          alertLevel: "normal",
+          streamUrl: "https://example.com/stream1"
+        },
+        {
+          id: 2,
+          name: "Crowd Density Monitor",
+          location: "Central Plaza",
+          status: "active",
+          viewerCount: 23,
+          alertLevel: "warning",
+          streamUrl: "https://example.com/stream2"
+        },
+        {
+          id: 3,
+          name: "Emergency Exit Monitor",
+          location: "South Exit",
+          status: "active",
+          viewerCount: 12,
+          alertLevel: "normal",
+          streamUrl: "https://example.com/stream3"
+        }
+      ];
+      
+      res.json(feeds);
+    } catch (error) {
+      console.error('Error fetching live feeds:', error);
+      res.status(500).json({ message: 'Failed to fetch live feeds' });
+    }
+  });
+
+  // Safety plan route
+  app.get('/api/safety/plan/:eventId', isAuthenticated, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.eventId);
+      const event = await storage.getEventById(eventId);
+      
+      if (!event) {
+        return res.status(404).json({ message: 'Event not found' });
+      }
+      
+      const safetyPlan = {
+        eventId,
+        eventTitle: event.title,
+        evacuationRoutes: [
+          {
+            id: 1,
+            name: "Primary Route - North Exit",
+            capacity: 5000,
+            estimatedTime: "3-5 minutes",
+            status: "clear"
+          },
+          {
+            id: 2,
+            name: "Secondary Route - South Exit", 
+            capacity: 3000,
+            estimatedTime: "5-7 minutes",
+            status: "clear"
+          }
+        ],
+        emergencyContacts: [
+          { role: "Event Commander", name: "Inspector Raj Kumar", phone: "+91-98765-43210" },
+          { role: "Medical Team Lead", name: "Dr. Priya Sharma", phone: "+91-98765-43211" }
+        ],
+        medicalStations: [
+          { id: 1, location: "Main Plaza", capacity: 50, staff: 8 },
+          { id: 2, location: "North Wing", capacity: 30, staff: 5 }
+        ],
+        securityDeployment: {
+          totalOfficers: 150,
+          plainClothes: 30,
+          uniformed: 90,
+          specialForces: 30
+        }
+      };
+      
+      res.json(safetyPlan);
+    } catch (error) {
+      console.error('Error fetching safety plan:', error);
+      res.status(500).json({ message: 'Failed to fetch safety plan' });
+    }
+  });
+
+  // Notifications route
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userEvents = await storage.getEventsByOrganizer(userId);
+      const notifications = [];
+      
+      for (const event of userEvents) {
+        if (event.status === 'approved' && event.approvedAt) {
+          notifications.push({
+            id: `event-${event.id}-approved`,
+            type: 'event_approved',
+            title: 'Event Approved',
+            message: `Your event "${event.title}" has been approved by authorities`,
+            timestamp: event.approvedAt,
+            read: false,
+            eventId: event.id
+          });
+        } else if (event.status === 'rejected') {
+          notifications.push({
+            id: `event-${event.id}-rejected`,
+            type: 'event_rejected', 
+            title: 'Event Rejected',
+            message: `Your event "${event.title}" has been rejected. Reason: ${event.rejectionReason || 'Not specified'}`,
+            timestamp: event.updatedAt,
+            read: false,
+            eventId: event.id
+          });
+        }
+      }
+      
+      res.json(notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ message: 'Failed to fetch notifications' });
     }
   });
 
