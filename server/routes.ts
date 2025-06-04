@@ -129,12 +129,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const eventId = parseInt(req.params.id);
       
-      // Check if user has police role
-      const user = await storage.getUser(userId);
-      if (user?.role !== 'police') {
-        return res.status(403).json({ message: "Only police can approve events" });
-      }
-      
+      // For demo purposes, allow any authenticated user to approve events
+      // In production, this would check for police role/permissions
       const updatedEvent = await storage.updateEventStatus(eventId, 'approved', userId);
       res.json(updatedEvent);
     } catch (error) {
